@@ -545,100 +545,158 @@ with tab2:
 with tab3:
     st.subheader("Analyse de performance du menu")
     
-    col1, col2 = st.columns([3, 2])
+    # Graphique principal - Barres horizontales
+    st.markdown("#### Performance des plats - Marge & Volume")
     
-    with col1:
-        st.markdown("#### Top plats - Volume & Rentabilité")
-        
-        fig = go.Figure()
-        
-        for idx, row in df_menu.iterrows():
-            size = row['revenue'] / 100
-            color = COLORS['success'] if row['margin'] > 70 else COLORS['warning'] if row['margin'] > 60 else COLORS['danger']
-            
-            fig.add_trace(go.Scatter(
-                x=[row['qty']],
-                y=[row['margin']],
-                mode='markers+text',
-                marker=dict(size=size, color=color, opacity=0.6),
-                text=row['name'],
-                textposition='top center',
-                name=row['name'],
-                hovertemplate=f"<b>{row['name']}</b><br>" +
-                             f"Quantité: {row['qty']}<br>" +
-                             f"Revenus: {row['revenue']}$<br>" +
-                             f"Marge: {row['margin']}%<extra></extra>"
-            ))
-        
-        fig.update_layout(
-            height=500,
-            xaxis_title="Volume de ventes",
-            yaxis_title="Marge (%)",
-            showlegend=False,
-            hovermode='closest',
-            plot_bgcolor='rgba(0,0,0,0)',
-            paper_bgcolor='rgba(0,0,0,0)',
-            font=dict(family='Inter', size=11)
-        )
-        
-        fig.add_hline(y=65, line_dash="dash", line_color="gray", opacity=0.5)
-        fig.add_vline(x=df_menu['qty'].median(), line_dash="dash", line_color="gray", opacity=0.5)
-        
-        fig.update_xaxes(showgrid=True, gridcolor='rgba(0,0,0,0.05)')
-        fig.update_yaxes(showgrid=True, gridcolor='rgba(0,0,0,0.05)')
-        
-        st.plotly_chart(fig, use_container_width=True)
+    # Trier par score
+    df_menu['score'] = (df_menu['qty'] / df_menu['qty'].max() * 50 + 
+                       df_menu['margin'] / 100 * 50)
+    df_menu_sorted = df_menu.sort_values('score', ascending=True)
     
-    with col2:
-        st.markdown("#### Classement des plats")
-        
-        df_menu['score'] = (df_menu['qty'] / df_menu['qty'].max() * 50 + 
-                           df_menu['margin'] / 100 * 50)
-        df_menu_sorted = df_menu.sort_values('score', ascending=False)
-        
-        for idx, row in df_menu_sorted.iterrows():
-            color = "green" if row['score'] > 75 else "orange" if row['score'] > 60 else "red"
-            st.markdown(f"""
-            **{row['name']}**  
-            Score: {row['score']:.0f}/100 | Marge: {row['margin']}% | Ventes: {row['qty']}  
-            :{color}[{'█' * int(row['score']/10)}]
-            """)
-            st.markdown("---")
+    fig = go.Figure()
+    
+    # Barres de marge
+    fig.add_trace(go.Bar(
+        y=df_menu_sorted['name'],
+        x=df_menu_sorted['margin'],
+        name='Marge (%)',
+        orientation='h',
+        marker=dict(
+            color=df_menu_sorted['margin'],
+            colorscale=[[0, '#ef4444'], [0.5, '#f59e0b'], [1, '#10b981']],
+            showscale=False
+        ),
+        text=df_menu_sorted['margin'].apply(lambda x: f"{x}%"),
+        textposition='outside',
+        hovertemplate='<b>%{y}</b><br>Marge: %{x}%<extra></extra>'
+    ))
+    
+    fig.update_layout(
+        height=450,
+        xaxis_title="Marge (%)",
+        yaxis_title="",
+        plot_bgcolor='white',
+        paper_bgcolor='white',
+        font=dict(family='Inter', size=12, color='#333'),
+        xaxis=dict(
+            showgrid=True,
+            gridcolor='#f0f0f0',
+            range=[0, 100]
+        ),
+        yaxis=dict(
+            showgrid=False
+        ),
+        margin=dict(t=20, b=40, l=20, r=80),
+        showlegend=False
+    )
+    
+    # Ligne de référence pour la marge cible
+    fig.add_vline(
+        x=65,
+        line_dash="dash",
+        line_color="gray",
+        opacity=0.5,
+        annotation_text="Marge cible: 65%",
+        annotation_position="top right"
+    )
+    
+    st.plotly_chart(fig, use_container_width=True)
     
     st.markdown("---")
     
-    st.markdown("#### Recommandations d'optimisation du menu")
+    # Tableau de données avec métriques
+    st.markdown("#### Détails par plat")
+    
+    col1, col2 = st.columns([2, 1])
+    
+    with col1:
+        # Préparer le dataframe pour affichage
+        display_menu = df_menu.sort_values('score', ascending=False)[['name', 'qty', 'margin', 'revenue']].copy()
+        display_menu.columns = ['Plat', 'Quantité vendue', 'Marge (%)', 'Revenus ($)']
+        display_menu['Revenus ($)'] = display_menu['Revenus ($)'].apply(lambda x: f"{x:,.0f} $")
+        
+        st.dataframe(
+            display_menu,
+            hide_index=True,
+            use_container_width=True,
+            height=350
+        )
+    
+    with col2:
+        st.markdown("##### Top 3 performers")
+        
+        top_3 = df_menu.nlargest(3, 'score')
+        
+        for idx, (i, row) in enumerate(top_3.iterrows(), 1):
+            medal = "🥇" if idx == 1 else "🥈" if idx == 2 else "🥉"
+            
+            st.markdown(f"""
+            <div style='background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%); 
+                        padding: 1rem; border-radius: 8px; margin-bottom: 0.75rem;
+                        border-left: 4px solid {COLORS['primary']};'>
+                <div style='font-weight: 600; font-size: 1rem; margin-bottom: 0.25rem;'>
+                    {medal} {row['name']}
+                </div>
+                <div style='font-size: 0.85rem; color: #64748b;'>
+                    Score: {row['score']:.0f}/100<br>
+                    Marge: {row['margin']}% • Ventes: {row['qty']}
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
+        
+        st.markdown("##### Alertes")
+        
+        bottom_2 = df_menu.nsmallest(2, 'score')
+        
+        for i, row in bottom_2.iterrows():
+            st.markdown(f"""
+            <div style='background: #fef3c7; padding: 0.75rem; border-radius: 8px; 
+                        margin-bottom: 0.5rem; border-left: 4px solid {COLORS['warning']};'>
+                <div style='font-weight: 600; font-size: 0.9rem;'>{row['name']}</div>
+                <div style='font-size: 0.8rem; color: #64748b;'>
+                    Marge faible: {row['margin']}%
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
+    
+    st.markdown("---")
+    
+    # Recommandations simplifiées
+    st.markdown("#### Recommandations stratégiques")
     
     col1, col2, col3 = st.columns(3)
     
     with col1:
-        st.success("""
-        **Stars (à promouvoir)**
-        - Pâtes Carbonara (72% marge)
-        - Pizza Margherita (75% marge)
-        - Salade César (78% marge)
-        
-        Action: Mise en avant visuelle dans le menu
-        """)
+        st.markdown("""
+        <div class="alert-success">
+            <strong>Stars à promouvoir</strong><br><br>
+            • Pâtes Carbonara (72% marge)<br>
+            • Pizza Margherita (75% marge)<br>
+            • Salade César (78% marge)<br><br>
+            <strong>Action:</strong> Mise en avant visuelle
+        </div>
+        """, unsafe_allow_html=True)
     
     with col2:
-        st.warning("""
-        **À optimiser**
-        - Saumon Atlantique (52% marge, gaspillage élevé)
-        - Steak-Frites (55% marge)
-        
-        Action: Renégocier fournisseurs ou ajuster prix
-        """)
+        st.markdown("""
+        <div class="alert-warning">
+            <strong>À optimiser</strong><br><br>
+            • Saumon (52% marge, gaspillage)<br>
+            • Steak-Frites (55% marge)<br><br>
+            <strong>Action:</strong> Renégocier fournisseurs
+        </div>
+        """, unsafe_allow_html=True)
     
     with col3:
-        st.info("""
-        **Opportunités**
-        - Ajouter plats végétariens (+25% demande)
-        - Menu saisonnier (automne)
-        - Formules midi attractives
-        
-        Action: Test A/B sur 2 semaines
-        """)
+        st.markdown("""
+        <div class="alert-info">
+            <strong>Opportunités</strong><br><br>
+            • Plats végétariens (+25% demande)<br>
+            • Menu saisonnier<br>
+            • Formules midi<br><br>
+            <strong>Action:</strong> Test A/B 2 semaines
+        </div>
+        """, unsafe_allow_html=True)
 
 # TAB 4: Prévisions IA
 with tab4:
