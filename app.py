@@ -14,16 +14,16 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Palette de couleurs professionnelle
+# Palette de couleurs Optimisation+ (basée sur la charte graphique)
 COLORS = {
-    'primary': '#2563eb',      # Bleu professionnel
-    'secondary': '#7c3aed',    # Violet tech
-    'accent': '#06b6d4',       # Cyan moderne
-    'success': '#10b981',      # Vert
-    'warning': '#f59e0b',      # Orange
-    'danger': '#ef4444',       # Rouge
-    'dark': '#1e293b',         # Gris foncé
-    'light': '#f8fafc',        # Gris clair
+    'primary': '#DD6D6D',      # Rose coral (couleur principale)
+    'secondary': '#3A1B50',    # Violet foncé (couleur secondaire)
+    'accent': '#FF8A8A',       # Rose clair (accent)
+    'success': '#10b981',      # Vert (succès)
+    'warning': '#f59e0b',      # Orange (alerte)
+    'danger': '#ef4444',       # Rouge (danger)
+    'dark': '#1e293b',         # Gris foncé (texte)
+    'light': '#f8fafc',        # Gris clair (fond)
     'text': '#334155'          # Texte principal
 }
 
@@ -223,6 +223,63 @@ def generate_data():
     
     df_forecast = pd.DataFrame(forecast_data)
     
+    # Nouvelles données de prévision
+    # Prévision prochaine journée (en heures)
+    next_day_hours = []
+    for hour in range(11, 23):
+        if 12 <= hour <= 14:
+            base_covers = 42
+        elif 18 <= hour <= 21:
+            base_covers = 58
+        else:
+            base_covers = 18
+        
+        covers = base_covers + np.random.randint(-5, 5)
+        next_day_hours.append({
+            'hour': hour,
+            'hour_label': f"{hour}h",
+            'predicted_covers': max(0, covers)
+        })
+    
+    df_next_day = pd.DataFrame(next_day_hours)
+    
+    # Prévision 7 prochains jours
+    next_7_days = []
+    for i in range(1, 8):
+        date = datetime.now() + timedelta(days=i)
+        day_of_week = date.weekday()
+        is_weekend = day_of_week >= 5
+        
+        base_covers = 85 if is_weekend else 65
+        covers = base_covers + np.random.randint(-8, 8)
+        
+        next_7_days.append({
+            'date': date,
+            'day_name': date.strftime('%A'),
+            'day_short': date.strftime('%a %d'),
+            'predicted_covers': max(0, covers)
+        })
+    
+    df_next_7_days = pd.DataFrame(next_7_days)
+    
+    # Prévision 3 prochains mois (plateaux mensuels)
+    next_3_months = []
+    for i in range(1, 4):
+        date = datetime.now() + timedelta(days=30*i)
+        month_name = date.strftime('%B')
+        
+        # Calcul basé sur les tendances saisonnières
+        base_covers_month = 2100 + (i * 120)  # Tendance croissante
+        covers = base_covers_month + np.random.randint(-100, 100)
+        
+        next_3_months.append({
+            'month': month_name,
+            'month_short': date.strftime('%b'),
+            'predicted_covers': max(0, covers)
+        })
+    
+    df_next_3_months = pd.DataFrame(next_3_months)
+    
     staff_data = {
         'position': ['Serveurs', 'Cuisiniers', 'Aide-cuisine', 'Bar', 'Management'],
         'headcount': [12, 8, 5, 3, 2],
@@ -232,283 +289,227 @@ def generate_data():
     df_staff = pd.DataFrame(staff_data)
     df_staff['monthly_cost'] = df_staff['avg_hourly_rate'] * df_staff['monthly_hours']
     
-    return df_sales, df_hourly, df_menu, df_forecast, df_staff
+    return df_sales, df_hourly, df_menu, df_forecast, df_staff, df_next_day, df_next_7_days, df_next_3_months
 
-df_sales, df_hourly, df_menu, df_forecast, df_staff = generate_data()
+df_sales, df_hourly, df_menu, df_forecast, df_staff, df_next_day, df_next_7_days, df_next_3_months = generate_data()
 
 # Sidebar
 with st.sidebar:
-    st.markdown(f"""
-    <div style='text-align: center; padding: 1.5rem 0; background: linear-gradient(135deg, {COLORS['primary']} 0%, {COLORS['secondary']} 100%); border-radius: 12px; margin-bottom: 1.5rem;'>
-        <h2 style='color: white; margin: 0; font-size: 1.5rem; font-weight: 700;'>Optimisation+</h2>
-        <p style='color: rgba(255,255,255,0.9); margin: 0.25rem 0 0 0; font-size: 0.85rem;'>Plateforme BI Restaurant</p>
-    </div>
-    """, unsafe_allow_html=True)
+    # Logo Optimisation+
+    try:
+        st.image("Logo_Rose.png", use_container_width=True)
+        st.markdown("<div style='height: 1rem;'></div>", unsafe_allow_html=True)
+    except:
+        # Fallback si le logo n'est pas trouvé
+        st.markdown(f"""
+        <div style='text-align: center; padding: 1.5rem 0; background: linear-gradient(135deg, {COLORS['primary']} 0%, {COLORS['secondary']} 100%); border-radius: 12px; margin-bottom: 1.5rem;'>
+            <h2 style='color: white; margin: 0; font-size: 1.5rem; font-weight: 700;'>Optimisation+</h2>
+            <p style='color: rgba(255,255,255,0.9); margin: 0.25rem 0 0 0; font-size: 0.85rem;'>Plateforme BI Restaurant</p>
+        </div>
+        """, unsafe_allow_html=True)
     
-    st.subheader("Période d'analyse")
-    period = st.selectbox(
-        "Sélectionnez la période",
-        ["7 derniers jours", "30 derniers jours", "90 derniers jours", "Année en cours"],
-        label_visibility="collapsed"
+    st.markdown("### 📊 Tableau de bord")
+    
+    date_range = st.date_input(
+        "Période d'analyse",
+        value=(datetime.now() - timedelta(days=30), datetime.now()),
+        max_value=datetime.now()
     )
     
-    period_map = {
-        "7 derniers jours": 7,
-        "30 derniers jours": 30,
-        "90 derniers jours": 90,
-        "Année en cours": 365
-    }
-    days = period_map[period]
-    df_filtered = df_sales.tail(days)
-    
     st.markdown("---")
-    st.subheader("Filtres avancés")
     
-    selected_days = st.multiselect(
-        "Jours de la semaine",
-        options=['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'],
-        default=['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'],
-        label_visibility="collapsed"
+    st.markdown("### 🎯 Filtres rapides")
+    
+    selected_metric = st.selectbox(
+        "Métrique principale",
+        ["Revenus", "Couverts", "Ticket moyen", "Marge"]
     )
     
-    if selected_days:
-        df_filtered = df_filtered[df_filtered['day_of_week'].isin(selected_days)]
+    comparison_period = st.selectbox(
+        "Comparer avec",
+        ["Semaine dernière", "Mois dernier", "Même période année dernière"]
+    )
     
     st.markdown("---")
-    st.info("Utilisez les filtres pour analyser des périodes spécifiques et identifier les tendances.")
+    
+    st.markdown("### 📈 KPIs en temps réel")
+    
+    current_revenue = df_sales['revenue'].tail(7).sum()
+    previous_revenue = df_sales['revenue'].tail(14).head(7).sum()
+    revenue_change = ((current_revenue - previous_revenue) / previous_revenue) * 100
+    
+    st.metric(
+        "Revenus (7 derniers jours)",
+        f"{current_revenue:,.0f} $",
+        f"{revenue_change:+.1f}%"
+    )
+    
+    current_covers = df_sales['covers'].tail(7).sum()
+    previous_covers = df_sales['covers'].tail(14).head(7).sum()
+    covers_change = ((current_covers - previous_covers) / previous_covers) * 100
+    
+    st.metric(
+        "Couverts (7 derniers jours)",
+        f"{current_covers:,.0f}",
+        f"{covers_change:+.1f}%"
+    )
+    
+    avg_ticket = current_revenue / current_covers if current_covers > 0 else 0
+    prev_avg_ticket = previous_revenue / previous_covers if previous_covers > 0 else 0
+    ticket_change = ((avg_ticket - prev_avg_ticket) / prev_avg_ticket * 100) if prev_avg_ticket > 0 else 0
+    
+    st.metric(
+        "Ticket moyen",
+        f"{avg_ticket:.2f} $",
+        f"{ticket_change:+.1f}%"
+    )
+    
+    st.markdown("---")
+    
+    st.markdown("### ⚡ Actions rapides")
+    
+    if st.button("📊 Exporter rapport", use_container_width=True):
+        st.success("Rapport exporté avec succès!")
+    
+    if st.button("🔔 Configurer alertes", use_container_width=True):
+        st.info("Configuration des alertes disponible prochainement")
+    
+    if st.button("💡 Suggestions IA", use_container_width=True):
+        st.info("Suggestions personnalisées disponibles prochainement")
 
 # Header
-st.markdown(f'<div class="main-header">Tableau de bord analytique</div>', unsafe_allow_html=True)
-st.markdown(f'<div class="sub-header">Intelligence d\'affaires alimentée par l\'IA • Optimisation+</div>', unsafe_allow_html=True)
+st.markdown('<h1 class="main-header">Optimisation+ | Intelligence d\'Affaires</h1>', unsafe_allow_html=True)
+st.markdown('<p class="sub-header">Tableaux de bord en temps réel pour optimiser votre restaurant</p>', unsafe_allow_html=True)
 
-# Tabs principales
+# Navigation par onglets
 tab1, tab2, tab3, tab4, tab5 = st.tabs([
-    "Vue d'ensemble", 
-    "Analyse des ventes", 
-    "Performance menu",
-    "Prévisions IA",
-    "Gestion du personnel"
+    "📊 Vue d'ensemble", 
+    "💰 Analyse des ventes", 
+    "🍽️ Performance menu",
+    "🔮 Prévisions & IA",
+    "👥 Gestion personnel"
 ])
 
 # TAB 1: Vue d'ensemble
 with tab1:
-    col1, col2, col3, col4, col5 = st.columns(5)
+    st.markdown('<div class="insight-box"><h4>💡 Insight du jour</h4><p style="font-size: 1.1rem; margin: 0;">Vos revenus ont augmenté de 12,3% cette semaine. Le Steak-Frites performe exceptionnellement bien (+28% vs semaine dernière).</p></div>', unsafe_allow_html=True)
     
-    total_revenue = df_filtered['revenue'].sum()
-    total_covers = df_filtered['covers'].sum()
-    avg_ticket = df_filtered['avg_ticket'].mean()
-    
-    prev_period = df_sales.tail(days * 2).head(days)
-    prev_revenue = prev_period['revenue'].sum()
-    revenue_change = ((total_revenue - prev_revenue) / prev_revenue * 100) if prev_revenue > 0 else 0
+    col1, col2, col3, col4 = st.columns(4)
     
     with col1:
+        total_revenue = df_sales['revenue'].sum()
         st.metric(
-            "Chiffre d'affaires",
+            "Revenus totaux",
             f"{total_revenue:,.0f} $",
-            f"{revenue_change:+.1f}%"
+            "+12.3%",
+            help="Revenus des 90 derniers jours"
         )
     
     with col2:
-        covers_change = ((total_covers - prev_period['covers'].sum()) / prev_period['covers'].sum() * 100)
+        total_covers = df_sales['covers'].sum()
         st.metric(
-            "Nombre de couverts",
+            "Couverts servis",
             f"{total_covers:,.0f}",
-            f"{covers_change:+.1f}%"
+            "+8.7%",
+            help="Nombre total de clients servis"
         )
     
     with col3:
-        ticket_change = ((avg_ticket - prev_period['avg_ticket'].mean()) / prev_period['avg_ticket'].mean() * 100)
+        avg_ticket_all = total_revenue / total_covers if total_covers > 0 else 0
         st.metric(
             "Ticket moyen",
-            f"{avg_ticket:.2f} $",
-            f"{ticket_change:+.1f}%"
+            f"{avg_ticket_all:.2f} $",
+            "+3.2%",
+            help="Revenu moyen par client"
         )
     
     with col4:
+        total_margin = df_menu['margin'].mean()
         st.metric(
-            "Taux d'occupation",
-            "74%",
-            "-1.2%"
-        )
-    
-    with col5:
-        st.metric(
-            "Satisfaction client",
-            "4.7/5",
-            "+0.2"
+            "Marge moyenne",
+            f"{total_margin:.1f}%",
+            "+1.8%",
+            help="Marge bénéficiaire moyenne"
         )
     
     st.markdown("---")
     
-    col1, col2 = st.columns(2)
+    col1, col2 = st.columns([2, 1])
     
     with col1:
-        st.subheader("Évolution du chiffre d'affaires")
+        st.markdown("#### Évolution des revenus (90 derniers jours)")
         
         fig = go.Figure()
+        
         fig.add_trace(go.Scatter(
-            x=df_filtered['date'],
-            y=df_filtered['revenue'],
+            x=df_sales['date'],
+            y=df_sales['revenue'],
             mode='lines',
-            name='Revenus',
+            name='Revenus quotidiens',
             line=dict(color=COLORS['primary'], width=3),
             fill='tozeroy',
-            fillcolor=f"rgba(37, 99, 235, 0.1)"
+            fillcolor=f"rgba(221, 109, 109, 0.1)"
         ))
         
-        df_filtered['ma7'] = df_filtered['revenue'].rolling(window=7).mean()
         fig.add_trace(go.Scatter(
-            x=df_filtered['date'],
-            y=df_filtered['ma7'],
+            x=df_sales['date'],
+            y=df_sales['revenue'].rolling(window=7).mean(),
             mode='lines',
             name='Moyenne mobile (7j)',
-            line=dict(color=COLORS['warning'], width=2, dash='dash')
+            line=dict(color=COLORS['secondary'], width=2, dash='dash')
         ))
         
         fig.update_layout(
             height=400,
             hovermode='x unified',
-            showlegend=True,
+            yaxis_title="Revenus ($)",
             legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
             plot_bgcolor='rgba(0,0,0,0)',
             paper_bgcolor='rgba(0,0,0,0)',
             font=dict(family='Inter', size=11)
         )
+        
         fig.update_xaxes(showgrid=True, gridcolor='rgba(0,0,0,0.05)')
         fig.update_yaxes(showgrid=True, gridcolor='rgba(0,0,0,0.05)')
+        
         st.plotly_chart(fig, use_container_width=True)
     
     with col2:
-        st.subheader("Affluence par heure")
+        st.markdown("#### Performance par jour")
         
-        fig = go.Figure()
+        day_performance = df_sales.groupby('day_of_week').agg({
+            'revenue': 'mean',
+            'covers': 'mean'
+        }).round(0)
         
-        colors = [COLORS['success'] if x > 60 else COLORS['warning'] if x > 30 else COLORS['accent'] 
-                  for x in df_hourly['covers']]
+        days_order = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
+        days_fr = ['Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi', 'Dimanche']
         
-        fig.add_trace(go.Bar(
-            x=df_hourly['hour'],
-            y=df_hourly['covers'],
-            marker_color=colors,
-            text=df_hourly['covers'],
-            textposition='outside'
-        ))
+        day_performance = day_performance.reindex(days_order)
+        day_performance.index = days_fr
+        
+        fig = go.Figure(data=[
+            go.Bar(
+                x=day_performance.index,
+                y=day_performance['revenue'],
+                marker_color=[COLORS['primary'] if i >= 5 else COLORS['secondary'] for i in range(7)],
+                text=day_performance['revenue'].astype(int),
+                textposition='outside'
+            )
+        ])
         
         fig.update_layout(
             height=400,
+            yaxis_title="Revenus moyens ($)",
             showlegend=False,
-            yaxis_title="Nombre de couverts",
             plot_bgcolor='rgba(0,0,0,0)',
             paper_bgcolor='rgba(0,0,0,0)',
-            font=dict(family='Inter', size=11)
+            font=dict(family='Inter', size=10)
         )
-        fig.update_xaxes(showgrid=False)
+        
+        fig.update_xaxes(showgrid=False, tickangle=-45)
         fig.update_yaxes(showgrid=True, gridcolor='rgba(0,0,0,0.05)')
-        st.plotly_chart(fig, use_container_width=True)
-    
-    st.markdown("---")
-    
-    st.subheader("Insights IA - Recommandations prioritaires")
-    
-    col1, col2, col3 = st.columns(3)
-    
-    with col1:
-        st.markdown(f"""
-        <div class="insight-box">
-            <h4>Opportunité détectée</h4>
-            <p><strong>Jeudi soir sous-optimisé</strong></p>
-            <p>Taux d'occupation: 48% vs 75% en moyenne</p>
-            <p><strong>Potentiel: +2,400$/mois</strong></p>
-            <p>Action: Promotion "Soirée duo" jeudi 18h-21h</p>
-        </div>
-        """, unsafe_allow_html=True)
-    
-    with col2:
-        st.markdown("""
-        <div class="warning-box">
-            <h4 style="font-weight: 600; margin-bottom: 0.5rem;">Alerte gaspillage</h4>
-            <p style="margin: 0.25rem 0;"><strong>Saumon Atlantique</strong></p>
-            <p style="margin: 0.25rem 0;">Taux de perte: 18% (cible: <10%)</p>
-            <p style="margin: 0.25rem 0;"><strong>Économie: 780$/mois</strong></p>
-            <p style="margin: 0.25rem 0;">Action: Réduire commandes de 25% lun-mar</p>
-        </div>
-        """, unsafe_allow_html=True)
-    
-    with col3:
-        st.markdown("""
-        <div class="success-box">
-            <h4 style="font-weight: 600; margin-bottom: 0.5rem;">Performance exceptionnelle</h4>
-            <p style="margin: 0.25rem 0;"><strong>Pâtes Carbonara</strong></p>
-            <p style="margin: 0.25rem 0;">Marge: 72% | Popularité: #1</p>
-            <p style="margin: 0.25rem 0;"><strong>Impact: +3-5% marge globale</strong></p>
-            <p style="margin: 0.25rem 0;">Action: Mise en vedette dans menu</p>
-        </div>
-        """, unsafe_allow_html=True)
-
-# TAB 2: Analyse des ventes
-with tab2:
-    st.subheader("Analyse approfondie des ventes")
-    
-    col1, col2 = st.columns([2, 1])
-    
-    with col1:
-        st.markdown("#### Revenus par jour de la semaine")
         
-        day_order = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
-        day_names_fr = ['Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi', 'Dimanche']
-        
-        weekly_data = df_sales.groupby('day_of_week').agg({
-            'revenue': 'mean',
-            'covers': 'mean'
-        }).reindex(day_order)
-        
-        weekly_data['day_fr'] = day_names_fr
-        
-        fig = go.Figure()
-        fig.add_trace(go.Bar(
-            x=weekly_data['day_fr'],
-            y=weekly_data['revenue'],
-            marker_color=COLORS['secondary'],
-            text=[f"{x:.0f}$" for x in weekly_data['revenue']],
-            textposition='outside'
-        ))
-        
-        fig.update_layout(
-            height=400, 
-            showlegend=False, 
-            yaxis_title="Revenus moyens",
-            plot_bgcolor='rgba(0,0,0,0)',
-            paper_bgcolor='rgba(0,0,0,0)',
-            font=dict(family='Inter', size=11)
-        )
-        fig.update_xaxes(showgrid=False)
-        fig.update_yaxes(showgrid=True, gridcolor='rgba(0,0,0,0.05)')
-        st.plotly_chart(fig, use_container_width=True)
-    
-    with col2:
-        st.markdown("#### Répartition des revenus")
-        
-        revenue_breakdown = {
-            'Plats principaux': 45,
-            'Entrées': 15,
-            'Desserts': 12,
-            'Boissons': 18,
-            'Vins & alcools': 10
-        }
-        
-        fig = go.Figure(data=[go.Pie(
-            labels=list(revenue_breakdown.keys()),
-            values=list(revenue_breakdown.values()),
-            hole=0.4,
-            marker_colors=[COLORS['primary'], COLORS['secondary'], COLORS['accent'], COLORS['success'], COLORS['warning']]
-        )])
-        
-        fig.update_layout(
-            height=400, 
-            showlegend=True,
-            font=dict(family='Inter', size=11)
-        )
         st.plotly_chart(fig, use_container_width=True)
     
     st.markdown("---")
@@ -516,210 +517,488 @@ with tab2:
     col1, col2 = st.columns(2)
     
     with col1:
-        st.markdown("#### Top 5 jours les plus rentables")
-        top_days = df_sales.nlargest(5, 'revenue')[['date', 'revenue', 'covers']]
-        top_days['date'] = top_days['date'].dt.strftime('%d/%m/%Y')
-        top_days['revenue'] = top_days['revenue'].apply(lambda x: f"{x:,.0f}$")
-        st.dataframe(top_days, hide_index=True, use_container_width=True)
+        st.success("""
+        ✅ **Points forts cette semaine**
+        - Weekend exceptionnel: +28% vs moyenne
+        - Ticket moyen en hausse constante
+        - Taux de rotation optimal (1.8 couverts/table)
+        - Marge brute à 68% (excellent)
+        """)
     
     with col2:
-        st.markdown("#### Tendances mensuelles")
-        monthly = df_sales.groupby(df_sales['date'].dt.to_period('M')).agg({
-            'revenue': 'sum',
-            'covers': 'sum'
-        }).reset_index()
-        monthly['date'] = monthly['date'].astype(str)
-        monthly['avg_ticket'] = monthly['revenue'] / monthly['covers']
+        st.warning("""
+        ⚠️ **Points d'attention**
+        - Lundi-mardi sous-performent (-15%)
+        - Coûts alimentaires en légère hausse (+3%)
+        - Temps d'attente moyen augmenté (18 min)
+        - 2 plats peu performants à revoir
+        """)
+
+# TAB 2: Analyse des ventes
+with tab2:
+    st.subheader("Analyse détaillée des ventes")
+    
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        st.markdown("#### Distribution des ventes par période")
         
-        st.dataframe(
-            monthly.style.format({
-                'revenue': '{:,.0f}$',
-                'covers': '{:,.0f}',
-                'avg_ticket': '{:.2f}$'
-            }),
-            hide_index=True,
-            use_container_width=True
+        fig = go.Figure(data=[go.Bar(
+            x=df_hourly['hour'],
+            y=df_hourly['covers'],
+            marker_color=[
+                COLORS['success'] if 12 <= int(h.split('h')[0]) <= 14 or 18 <= int(h.split('h')[0]) <= 21 
+                else COLORS['primary'] 
+                for h in df_hourly['hour']
+            ],
+            text=df_hourly['covers'],
+            textposition='outside'
+        )])
+        
+        fig.update_layout(
+            height=400,
+            yaxis_title="Nombre de couverts",
+            xaxis_title="Période",
+            showlegend=False,
+            plot_bgcolor='rgba(0,0,0,0)',
+            paper_bgcolor='rgba(0,0,0,0)',
+            font=dict(family='Inter', size=11)
         )
+        
+        fig.update_xaxes(showgrid=False, tickangle=-45)
+        fig.update_yaxes(showgrid=True, gridcolor='rgba(0,0,0,0.05)')
+        
+        st.plotly_chart(fig, use_container_width=True)
+        
+        st.info("""
+        **💡 Insight horaire**
+        - Pic du midi: 12h-14h (125 couverts/jour)
+        - Pic du soir: 19h-20h (145 couverts/jour)
+        - Recommandation: Renforcer staff 18h30-21h
+        """)
+    
+    with col2:
+        st.markdown("#### Répartition revenus vs coûts")
+        
+        total_revenue_pie = df_sales['revenue'].sum()
+        estimated_costs = total_revenue_pie * 0.32
+        estimated_margin = total_revenue_pie - estimated_costs
+        
+        fig = go.Figure(data=[go.Pie(
+            labels=['Marge nette', 'Coûts opérationnels'],
+            values=[estimated_margin, estimated_costs],
+            hole=0.5,
+            marker_colors=[COLORS['success'], COLORS['warning']],
+            textinfo='label+percent',
+            textposition='outside'
+        )])
+        
+        fig.update_layout(
+            height=400,
+            annotations=[dict(text=f'{(estimated_margin/total_revenue_pie*100):.1f}%<br>Marge', 
+                             x=0.5, y=0.5, font_size=20, showarrow=False)],
+            font=dict(family='Inter', size=11)
+        )
+        
+        st.plotly_chart(fig, use_container_width=True)
+        
+        st.success("""
+        **💰 Performance financière**
+        - Marge brute: 68%
+        - Coût nourriture: 28%
+        - Coût personnel: 32%
+        - Autres coûts: 12%
+        """)
+    
+    st.markdown("---")
+    
+    st.markdown("#### Tendances hebdomadaires")
+    
+    df_sales['week'] = df_sales['date'].dt.isocalendar().week
+    weekly_data = df_sales.groupby('week').agg({
+        'revenue': 'sum',
+        'covers': 'sum'
+    }).reset_index()
+    
+    fig = go.Figure()
+    
+    fig.add_trace(go.Scatter(
+        x=weekly_data['week'],
+        y=weekly_data['revenue'],
+        name='Revenus hebdo',
+        mode='lines+markers',
+        line=dict(color=COLORS['primary'], width=3),
+        marker=dict(size=8)
+    ))
+    
+    fig.add_trace(go.Scatter(
+        x=weekly_data['week'],
+        y=weekly_data['covers'] * 30,
+        name='Couverts (x30)',
+        mode='lines+markers',
+        line=dict(color=COLORS['secondary'], width=2, dash='dash'),
+        marker=dict(size=6),
+        yaxis='y2'
+    ))
+    
+    fig.update_layout(
+        height=400,
+        hovermode='x unified',
+        yaxis=dict(title="Revenus ($)"),
+        yaxis2=dict(title="Couverts (x30)", overlaying='y', side='right'),
+        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
+        plot_bgcolor='rgba(0,0,0,0)',
+        paper_bgcolor='rgba(0,0,0,0)',
+        font=dict(family='Inter', size=11)
+    )
+    
+    fig.update_xaxes(showgrid=True, gridcolor='rgba(0,0,0,0.05)', title="Semaine")
+    fig.update_yaxes(showgrid=True, gridcolor='rgba(0,0,0,0.05)')
+    
+    st.plotly_chart(fig, use_container_width=True)
 
 # TAB 3: Performance menu
 with tab3:
     st.subheader("Analyse de performance du menu")
     
-    # Graphique principal - Barres horizontales
-    st.markdown("#### Performance des plats - Marge & Volume")
-    
-    # Trier par score
-    df_menu['score'] = (df_menu['qty'] / df_menu['qty'].max() * 50 + 
-                       df_menu['margin'] / 100 * 50)
-    df_menu_sorted = df_menu.sort_values('score', ascending=True)
-    
-    fig = go.Figure()
-    
-    # Barres de marge
-    fig.add_trace(go.Bar(
-        y=df_menu_sorted['name'],
-        x=df_menu_sorted['margin'],
-        name='Marge (%)',
-        orientation='h',
-        marker=dict(
-            color=df_menu_sorted['margin'],
-            colorscale=[[0, '#ef4444'], [0.5, '#f59e0b'], [1, '#10b981']],
-            showscale=False
-        ),
-        text=df_menu_sorted['margin'].apply(lambda x: f"{x}%"),
-        textposition='outside',
-        hovertemplate='<b>%{y}</b><br>Marge: %{x}%<extra></extra>'
-    ))
-    
-    fig.update_layout(
-        height=450,
-        xaxis_title="Marge (%)",
-        yaxis_title="",
-        plot_bgcolor='white',
-        paper_bgcolor='white',
-        font=dict(family='Inter', size=12, color='#333'),
-        xaxis=dict(
-            showgrid=True,
-            gridcolor='#f0f0f0',
-            range=[0, 100]
-        ),
-        yaxis=dict(
-            showgrid=False
-        ),
-        margin=dict(t=20, b=40, l=20, r=80),
-        showlegend=False
-    )
-    
-    # Ligne de référence pour la marge cible
-    fig.add_vline(
-        x=65,
-        line_dash="dash",
-        line_color="gray",
-        opacity=0.5,
-        annotation_text="Marge cible: 65%",
-        annotation_position="top right"
-    )
-    
-    st.plotly_chart(fig, use_container_width=True)
-    
-    st.markdown("---")
-    
-    # Tableau de données avec métriques
-    st.markdown("#### Détails par plat")
-    
     col1, col2 = st.columns([2, 1])
     
     with col1:
-        # Préparer le dataframe pour affichage
-        display_menu = df_menu.sort_values('score', ascending=False)[['name', 'qty', 'margin', 'revenue']].copy()
-        display_menu.columns = ['Plat', 'Quantité vendue', 'Marge (%)', 'Revenus ($)']
-        display_menu['Revenus ($)'] = display_menu['Revenus ($)'].apply(lambda x: f"{x:,.0f} $")
+        st.markdown("#### Top performers du menu")
         
-        st.dataframe(
-            display_menu,
-            hide_index=True,
-            use_container_width=True,
-            height=350
+        fig = go.Figure()
+        
+        fig.add_trace(go.Bar(
+            y=df_menu['name'],
+            x=df_menu['revenue'],
+            name='Revenus',
+            orientation='h',
+            marker=dict(
+                color=df_menu['margin'],
+                colorscale=[[0, COLORS['danger']], [0.5, COLORS['warning']], [1, COLORS['success']]],
+                showscale=True,
+                colorbar=dict(title="Marge %")
+            ),
+            text=df_menu['revenue'].apply(lambda x: f"{x:,.0f}$"),
+            textposition='outside'
+        ))
+        
+        fig.update_layout(
+            height=450,
+            xaxis_title="Revenus générés ($)",
+            yaxis_title="",
+            showlegend=False,
+            plot_bgcolor='rgba(0,0,0,0)',
+            paper_bgcolor='rgba(0,0,0,0)',
+            font=dict(family='Inter', size=11)
         )
+        
+        fig.update_xaxes(showgrid=True, gridcolor='rgba(0,0,0,0.05)')
+        fig.update_yaxes(showgrid=False)
+        
+        st.plotly_chart(fig, use_container_width=True)
     
     with col2:
-        st.markdown("##### Top 3 performers")
+        st.markdown("#### Matrice BCG")
         
-        top_3 = df_menu.nlargest(3, 'score')
+        df_menu['revenue_score'] = (df_menu['revenue'] - df_menu['revenue'].min()) / (df_menu['revenue'].max() - df_menu['revenue'].min())
+        df_menu['qty_score'] = (df_menu['qty'] - df_menu['qty'].min()) / (df_menu['qty'].max() - df_menu['qty'].min())
         
-        for idx, (i, row) in enumerate(top_3.iterrows(), 1):
-            medal = "🥇" if idx == 1 else "🥈" if idx == 2 else "🥉"
-            
-            st.markdown(f"""
-            <div style='background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%); 
-                        padding: 1rem; border-radius: 8px; margin-bottom: 0.75rem;
-                        border-left: 4px solid {COLORS['primary']};'>
-                <div style='font-weight: 600; font-size: 1rem; margin-bottom: 0.25rem;'>
-                    {medal} {row['name']}
-                </div>
-                <div style='font-size: 0.85rem; color: #64748b;'>
-                    Score: {row['score']:.0f}/100<br>
-                    Marge: {row['margin']}% • Ventes: {row['qty']}
-                </div>
-            </div>
-            """, unsafe_allow_html=True)
+        fig = go.Figure()
         
-        st.markdown("##### Alertes")
+        fig.add_trace(go.Scatter(
+            x=df_menu['qty_score'],
+            y=df_menu['revenue_score'],
+            mode='markers+text',
+            marker=dict(
+                size=df_menu['margin'],
+                color=df_menu['margin'],
+                colorscale=[[0, COLORS['danger']], [0.5, COLORS['warning']], [1, COLORS['success']]],
+                showscale=False,
+                line=dict(width=2, color='white')
+            ),
+            text=df_menu['name'].str.split().str[0],
+            textposition='top center',
+            textfont=dict(size=9)
+        ))
         
-        bottom_2 = df_menu.nsmallest(2, 'score')
+        fig.add_hline(y=0.5, line_dash="dash", line_color="gray", opacity=0.5)
+        fig.add_vline(x=0.5, line_dash="dash", line_color="gray", opacity=0.5)
         
-        for i, row in bottom_2.iterrows():
-            st.markdown(f"""
-            <div style='background: #fef3c7; padding: 0.75rem; border-radius: 8px; 
-                        margin-bottom: 0.5rem; border-left: 4px solid {COLORS['warning']};'>
-                <div style='font-weight: 600; font-size: 0.9rem;'>{row['name']}</div>
-                <div style='font-size: 0.8rem; color: #64748b;'>
-                    Marge faible: {row['margin']}%
-                </div>
-            </div>
-            """, unsafe_allow_html=True)
+        fig.add_annotation(x=0.25, y=0.75, text="⭐ Stars", showarrow=False, font=dict(size=12, color=COLORS['success']))
+        fig.add_annotation(x=0.75, y=0.75, text="💰 Cash Cows", showarrow=False, font=dict(size=12, color=COLORS['primary']))
+        fig.add_annotation(x=0.25, y=0.25, text="❓ Question Marks", showarrow=False, font=dict(size=12, color=COLORS['warning']))
+        fig.add_annotation(x=0.75, y=0.25, text="🐕 Dogs", showarrow=False, font=dict(size=12, color=COLORS['danger']))
+        
+        fig.update_layout(
+            height=450,
+            xaxis_title="Popularité →",
+            yaxis_title="Revenus →",
+            showlegend=False,
+            plot_bgcolor='rgba(0,0,0,0)',
+            paper_bgcolor='rgba(0,0,0,0)',
+            font=dict(family='Inter', size=11)
+        )
+        
+        st.plotly_chart(fig, use_container_width=True)
     
     st.markdown("---")
     
-    # Recommandations simplifiées
-    st.markdown("#### Recommandations stratégiques")
+    st.markdown("#### Détails du menu")
+    
+    display_df = df_menu[['name', 'qty', 'revenue', 'margin']].copy()
+    display_df.columns = ['Plat', 'Quantité vendue', 'Revenus', 'Marge (%)']
+    display_df['Revenus'] = display_df['Revenus'].apply(lambda x: f"{x:,.0f}$")
+    
+    st.dataframe(
+        display_df,
+        hide_index=True,
+        use_container_width=True,
+        column_config={
+            "Marge (%)": st.column_config.ProgressColumn(
+                "Marge (%)",
+                format="%d%%",
+                min_value=0,
+                max_value=100,
+            ),
+        }
+    )
+    
+    st.markdown("---")
     
     col1, col2, col3 = st.columns(3)
     
     with col1:
-        st.markdown("""
-        <div class="alert-success">
-            <strong>Stars à promouvoir</strong><br><br>
-            • Pâtes Carbonara (72% marge)<br>
-            • Pizza Margherita (75% marge)<br>
-            • Salade César (78% marge)<br><br>
-            <strong>Action:</strong> Mise en avant visuelle
-        </div>
-        """, unsafe_allow_html=True)
+        st.success("""
+        **🌟 Plats stars**
+        1. Steak-Frites (22,800$)
+        2. Saumon Atlantique (18,900$)
+        3. Pâtes Carbonara (17,800$)
+        
+        → Maintenir qualité et disponibilité
+        """)
     
     with col2:
-        st.markdown("""
-        <div class="alert-warning">
-            <strong>À optimiser</strong><br><br>
-            • Saumon (52% marge, gaspillage)<br>
-            • Steak-Frites (55% marge)<br><br>
-            <strong>Action:</strong> Renégocier fournisseurs
-        </div>
-        """, unsafe_allow_html=True)
+        st.warning("""
+        **⚠️ À optimiser**
+        - Poulet Rôti: faible marge (35%)
+        - Salade César: peu vendue
+        
+        → Revoir recette ou retirer
+        """)
     
     with col3:
-        st.markdown("""
-        <div class="alert-info">
-            <strong>Opportunités</strong><br><br>
-            • Plats végétariens (+25% demande)<br>
-            • Menu saisonnier<br>
-            • Formules midi<br><br>
-            <strong>Action:</strong> Test A/B 2 semaines
-        </div>
-        """, unsafe_allow_html=True)
+        st.info("""
+        **💡 Opportunités**
+        - Augmenter prix Steak +2$
+        - Promouvoir Risotto (marge 70%)
+        - Bundle Pizza + Salade
+        
+        → Impact: +3,200$/mois
+        """)
 
-# TAB 4: Prévisions IA
+# TAB 4: Prévisions & IA
 with tab4:
-    st.subheader("Prévisions intelligentes alimentées par l'IA")
+    st.subheader("Prévisions intelligentes et analyses prédictives")
     
-    st.markdown("#### Prévision des revenus - 30 prochains jours")
+    # Section 1: Prévision prochaine journée (en heures)
+    st.markdown("#### 📅 Prévision pour la prochaine journée (par heure)")
     
     fig = go.Figure()
     
-    fig.add_trace(go.Scatter(
-        x=df_sales.tail(30)['date'],
-        y=df_sales.tail(30)['revenue'],
-        mode='lines',
-        name='Historique',
-        line=dict(color=COLORS['primary'], width=3)
+    fig.add_trace(go.Bar(
+        x=df_next_day['hour_label'],
+        y=df_next_day['predicted_covers'],
+        marker_color=[
+            COLORS['success'] if 12 <= h <= 14 or 18 <= h <= 21 
+            else COLORS['primary'] 
+            for h in df_next_day['hour']
+        ],
+        text=df_next_day['predicted_covers'],
+        textposition='outside',
+        name='Couverts prévus'
     ))
+    
+    fig.update_layout(
+        height=350,
+        yaxis_title="Nombre de couverts prévus",
+        xaxis_title="Heure",
+        showlegend=False,
+        plot_bgcolor='rgba(0,0,0,0)',
+        paper_bgcolor='rgba(0,0,0,0)',
+        font=dict(family='Inter', size=11)
+    )
+    
+    fig.update_xaxes(showgrid=False, tickangle=-45)
+    fig.update_yaxes(showgrid=True, gridcolor='rgba(0,0,0,0.05)')
+    
+    st.plotly_chart(fig, use_container_width=True)
+    
+    col1, col2, col3 = st.columns(3)
+    
+    total_next_day = df_next_day['predicted_covers'].sum()
+    peak_hour = df_next_day.loc[df_next_day['predicted_covers'].idxmax()]
+    
+    with col1:
+        st.metric(
+            "Total couverts prévus demain",
+            f"{total_next_day:.0f}",
+            "+8% vs moyenne"
+        )
+    
+    with col2:
+        st.metric(
+            "Heure de pointe",
+            f"{peak_hour['hour_label']}",
+            f"{peak_hour['predicted_covers']:.0f} couverts"
+        )
+    
+    with col3:
+        estimated_revenue = total_next_day * 52
+        st.metric(
+            "Revenus estimés",
+            f"{estimated_revenue:,.0f} $",
+            "Ticket moyen: 52$"
+        )
+    
+    st.markdown("---")
+    
+    # Section 2: Prévision 7 prochains jours
+    st.markdown("#### 📆 Prévision pour les 7 prochains jours")
+    
+    fig = go.Figure()
+    
+    fig.add_trace(go.Bar(
+        x=df_next_7_days['day_short'],
+        y=df_next_7_days['predicted_covers'],
+        marker_color=[
+            COLORS['accent'] if 'Sam' in day or 'Dim' in day 
+            else COLORS['secondary'] 
+            for day in df_next_7_days['day_short']
+        ],
+        text=df_next_7_days['predicted_covers'],
+        textposition='outside',
+        name='Couverts prévus'
+    ))
+    
+    fig.update_layout(
+        height=350,
+        yaxis_title="Nombre de couverts prévus",
+        xaxis_title="Jour",
+        showlegend=False,
+        plot_bgcolor='rgba(0,0,0,0)',
+        paper_bgcolor='rgba(0,0,0,0)',
+        font=dict(family='Inter', size=11)
+    )
+    
+    fig.update_xaxes(showgrid=False)
+    fig.update_yaxes(showgrid=True, gridcolor='rgba(0,0,0,0.05)')
+    
+    st.plotly_chart(fig, use_container_width=True)
+    
+    col1, col2, col3 = st.columns(3)
+    
+    total_7_days = df_next_7_days['predicted_covers'].sum()
+    best_day = df_next_7_days.loc[df_next_7_days['predicted_covers'].idxmax()]
+    
+    with col1:
+        st.metric(
+            "Total 7 jours",
+            f"{total_7_days:.0f} couverts",
+            "+12% vs semaine dernière"
+        )
+    
+    with col2:
+        st.metric(
+            "Meilleur jour prévu",
+            best_day['day_name'],
+            f"{best_day['predicted_covers']:.0f} couverts"
+        )
+    
+    with col3:
+        avg_7_days = total_7_days / 7
+        st.metric(
+            "Moyenne quotidienne",
+            f"{avg_7_days:.0f} couverts",
+            "Stable"
+        )
+    
+    st.markdown("---")
+    
+    # Section 3: Prévision 3 prochains mois (plateaux mensuels)
+    st.markdown("#### 📊 Prévision des plateaux mensuels (3 prochains mois)")
+    
+    fig = go.Figure()
+    
+    fig.add_trace(go.Bar(
+        x=df_next_3_months['month'],
+        y=df_next_3_months['predicted_covers'],
+        marker=dict(
+            color=df_next_3_months['predicted_covers'],
+            colorscale=[[0, COLORS['secondary']], [1, COLORS['primary']]],
+            showscale=False
+        ),
+        text=df_next_3_months['predicted_covers'].apply(lambda x: f"{x:.0f}"),
+        textposition='outside',
+        name='Couverts mensuels prévus'
+    ))
+    
+    fig.update_layout(
+        height=350,
+        yaxis_title="Nombre de couverts mensuels",
+        xaxis_title="Mois",
+        showlegend=False,
+        plot_bgcolor='rgba(0,0,0,0)',
+        paper_bgcolor='rgba(0,0,0,0)',
+        font=dict(family='Inter', size=11)
+    )
+    
+    fig.update_xaxes(showgrid=False)
+    fig.update_yaxes(showgrid=True, gridcolor='rgba(0,0,0,0.05)')
+    
+    st.plotly_chart(fig, use_container_width=True)
+    
+    col1, col2, col3 = st.columns(3)
+    
+    total_3_months = df_next_3_months['predicted_covers'].sum()
+    growth_rate = ((df_next_3_months.iloc[-1]['predicted_covers'] - df_next_3_months.iloc[0]['predicted_covers']) / df_next_3_months.iloc[0]['predicted_covers']) * 100
+    
+    with col1:
+        st.metric(
+            "Total 3 mois",
+            f"{total_3_months:,.0f} couverts",
+            f"+{growth_rate:.1f}% croissance"
+        )
+    
+    with col2:
+        avg_monthly = total_3_months / 3
+        st.metric(
+            "Moyenne mensuelle",
+            f"{avg_monthly:,.0f} couverts",
+            "Tendance haussière"
+        )
+    
+    with col3:
+        best_month = df_next_3_months.loc[df_next_3_months['predicted_covers'].idxmax()]
+        st.metric(
+            "Meilleur mois prévu",
+            best_month['month'],
+            f"{best_month['predicted_covers']:.0f} couverts"
+        )
+    
+    st.markdown("---")
+    
+    # Prévisions revenus 30 jours (graphique existant)
+    st.markdown("#### 💰 Prévisions de revenus (30 prochains jours)")
+    
+    fig = go.Figure()
     
     fig.add_trace(go.Scatter(
         x=df_forecast['date'],
         y=df_forecast['predicted_revenue'],
         mode='lines',
-        name='Prévisions IA',
-        line=dict(color=COLORS['success'], width=3, dash='dash')
+        name='Revenus prévus',
+        line=dict(color=COLORS['success'], width=3)
     ))
     
     fig.add_trace(go.Scatter(
@@ -775,11 +1054,11 @@ with tab4:
         )
     
     with col3:
-        best_day = df_forecast.loc[df_forecast['predicted_revenue'].idxmax()]
+        best_day_rev = df_forecast.loc[df_forecast['predicted_revenue'].idxmax()]
         st.metric(
             "Meilleur jour prévu",
-            best_day['date'].strftime('%d/%m'),
-            f"{best_day['predicted_revenue']:.0f} $"
+            best_day_rev['date'].strftime('%d/%m'),
+            f"{best_day_rev['predicted_revenue']:.0f} $"
         )
     
     with col4:
@@ -788,50 +1067,6 @@ with tab4:
             "3,840$/mois",
             "Grâce aux prévisions"
         )
-    
-    st.markdown("---")
-    
-    st.markdown("#### Facteurs d'influence détectés par l'IA")
-    
-    col1, col2 = st.columns([2, 1])
-    
-    with col1:
-        factors = {
-            'Météo': 18,
-            'Événements locaux': 25,
-            'Jours fériés': 30,
-            'Saison': 22,
-            'Promotions': 35,
-            'Réseaux sociaux': 15
-        }
-        
-        fig = go.Figure()
-        
-        fig.add_trace(go.Scatterpolar(
-            r=list(factors.values()),
-            theta=list(factors.keys()),
-            fill='toself',
-            fillcolor=f"rgba(37, 99, 235, 0.2)",
-            line=dict(color=COLORS['primary'], width=3)
-        ))
-        
-        fig.update_layout(
-            height=400,
-            polar=dict(
-                radialaxis=dict(visible=True, range=[0, 40])
-            ),
-            showlegend=False,
-            font=dict(family='Inter', size=11)
-        )
-        
-        st.plotly_chart(fig, use_container_width=True)
-    
-    with col2:
-        st.markdown("##### Impact sur revenus")
-        for factor, impact in sorted(factors.items(), key=lambda x: x[1], reverse=True):
-            st.markdown(f"**{factor}**")
-            st.progress(impact / 40)
-            st.caption(f"±{impact}% d'impact")
     
     st.markdown("---")
     
